@@ -187,6 +187,8 @@ bool DistanceApproachIPOPTCUDAInterface::get_bounds_info(int n, double* x_l,
   variable_index += 4;
 
   // During horizons, 2 ~ N-1
+  // TODO(fengzongbao): try to paralize all for loop based on horizon_
+  // update x_l x_u use cuda kernel function
   for (int i = 1; i < horizon_; ++i) {
     // x
     x_l[variable_index] = -2e19;
@@ -298,6 +300,7 @@ bool DistanceApproachIPOPTCUDAInterface::get_bounds_info(int n, double* x_l,
 
   // 4. Three obstacles related equal constraints, one equality constraints,
   // [0, horizon_] * [0, obstacles_num_-1] * 4
+  // TODO(fengzongbao): update g_l g_u, by cuda kernel function
   for (int i = 0; i < horizon_ + 1; ++i) {
     for (int j = 0; j < obstacles_num_; ++j) {
       // a. norm(A'*lambda) <= 1
@@ -397,6 +400,7 @@ bool DistanceApproachIPOPTCUDAInterface::get_starting_point(
   CHECK_EQ(horizon_ + 1, xWS_.cols());
 
   // 1. state variables 4 * (horizon_ + 1)
+  // TODO(fengzongbao): update x use cuda kernel fuction instead
   for (int i = 0; i < horizon_ + 1; ++i) {
     int index = i * 4;
     for (int j = 0; j < 4; ++j) {
@@ -470,6 +474,7 @@ bool DistanceApproachIPOPTCUDAInterface::eval_grad_f_hand(int n,
   } else {
     std::fill(grad_f, grad_f + n, 0.0);
     // 1. objective to minimize state diff to warm up
+    // TODO(fengzongbao): update grad_f by 1D kernel function
     for (int i = 0; i < horizon_ + 1; ++i) {
       grad_f[state_index] +=
           2 * weight_state_x_ * (x[state_index] - xWS_(0, i));
@@ -1451,6 +1456,7 @@ bool DistanceApproachIPOPTCUDAInterface::eval_jac_g_ser(int n, const double* x,
     int time_index = time_start_index_;
 
     // 1. State Constraint with respect to variables
+    // TODO(fengzongbao): use cuda kernel fucntion update iRow and jCol
     for (int i = 0; i < horizon_; ++i) {
       // g(0)' with respect to x0 ~ x7
       iRow[nz_index] = state_index;
@@ -2271,6 +2277,7 @@ bool DistanceApproachIPOPTCUDAInterface::eval_h(int n, const double* x,
     // return the structure. This is a symmetric matrix, fill the lower left
     // triangle only.
 #ifdef USE_GPU
+    // TODO(fengzongbao): nnz_L = 0 incorrect for cude kernel limitation
     fill_lower_left(iRow, jCol, rind_L, cind_L, nnz_L);
 #else
     AFATAL << "CUDA enabled without GPU!";
@@ -2278,7 +2285,6 @@ bool DistanceApproachIPOPTCUDAInterface::eval_h(int n, const double* x,
   } else {
     // return the values. This is a symmetric matrix, fill the lower left
     // triangle only
-
     obj_lam[0] = obj_factor;
 #ifdef USE_GPU
     data_transfer(&obj_lam[1], lambda, m);
@@ -2291,6 +2297,7 @@ bool DistanceApproachIPOPTCUDAInterface::eval_h(int n, const double* x,
                 &hessval, options_L);
 
 #ifdef USE_GPU
+    // TODO(fengzongbao): maybe can update by cuda kernel 
     if (!data_transfer(values, hessval, nnz_L)) {
       for (int idx = 0; idx < nnz_L; idx++) {
         values[idx] = hessval[idx];
