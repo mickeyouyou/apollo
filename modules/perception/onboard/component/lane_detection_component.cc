@@ -15,10 +15,6 @@
  *****************************************************************************/
 #include "modules/perception/onboard/component/lane_detection_component.h"
 
-#include <yaml-cpp/yaml.h>
-#include <boost/algorithm/string.hpp>
-#include <boost/format.hpp>
-
 #include <algorithm>
 #include <iomanip>
 #include <iostream>
@@ -28,6 +24,9 @@
 #include "Eigen/Core"
 #include "Eigen/Dense"
 #include "absl/strings/str_cat.h"
+#include "boost/algorithm/string.hpp"
+#include "boost/format.hpp"
+#include "yaml-cpp/yaml.h"
 
 #include "cyber/common/file.h"
 #include "cyber/common/log.h"
