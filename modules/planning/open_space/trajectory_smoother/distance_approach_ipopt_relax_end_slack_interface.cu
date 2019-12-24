@@ -46,7 +46,8 @@ DistanceApproachIPOPTRelaxEndSlackInterface::
       XYbounds_(XYbounds),
       obstacles_edges_num_(obstacles_edges_num),
       obstacles_A_(obstacles_A),
-      obstacles_b_(obstacles_b) {
+      obstacles_b_(obstacles_b),
+      enable_jacobian_ad_(true) {
   CHECK(horizon < std::numeric_limits<int>::max())
       << "Invalid cast on horizon in open space planner";
   horizon_ = static_cast<int>(horizon);
@@ -114,7 +115,6 @@ DistanceApproachIPOPTRelaxEndSlackInterface::
   wheelbase_ = vehicle_param_.wheel_base();
   enable_constraint_check_ =
       distance_approach_config_.enable_constraint_check();
-  enable_jacobian_ad_ = true;
 }
 
 bool DistanceApproachIPOPTRelaxEndSlackInterface::get_nlp_info(
@@ -183,7 +183,9 @@ bool DistanceApproachIPOPTRelaxEndSlackInterface::get_bounds_info(
   variable_index += 4;
 
   // During horizons, 2 ~ N-1
-  // TODO: CUDA
+  // horizon_
+  // TODO(fengzongbao): CUDA refactor all loops based horizon_
+  // x_l x_u need unifined memory
   for (int i = 1; i < horizon_; ++i) {
     // x
     x_l[variable_index] = -2e19;
@@ -711,6 +713,7 @@ void DistanceApproachIPOPTRelaxEndSlackInterface::eval_obj(int n, const T* x,
   // purpose, later code refine towards improving efficiency
 
   *obj_value = 0.0;
+  // TODO GRID BASED CALULATE Obj_value
   // 1. objective to minimize state diff to warm up
   for (int i = 0; i < horizon_ + 1; ++i) {
     T x1_diff = x[state_index] - xWS_(0, i);
@@ -1008,7 +1011,7 @@ bool DistanceApproachIPOPTRelaxEndSlackInterface::check_g(int n,
                                                           const double* g) {
   int kN = n;
   int kM = m;
-  
+
   double x_u_tmp[kN];
   double x_l_tmp[kN];
   double g_u_tmp[kM];

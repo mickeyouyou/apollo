@@ -533,8 +533,7 @@ bool DistancePlan(HybridAStar* hybridA_ptr, ObstacleContainer* obstacles_ptr,
         AERROR << "state horizon smaller than 2";
         return false;
       }
-      AINFO << "trajectory idx: "
-            << "idx range: " << trajectory_point_size << ", "
+      AINFO << "trajectory idx range: " << trajectory_point_size << ", "
             << trajectory_point_size +
                    static_cast<size_t>(state_result_ds_vec[i].cols()) - 1;
       trajectory_point_size +=
