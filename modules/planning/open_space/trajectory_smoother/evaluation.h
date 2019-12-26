@@ -23,10 +23,16 @@ namespace apollo {
 namespace planning {
 
 template <typename T>
-__global__ void objective_eval(int n, const T *x, double ts_, int horizon_,
-                               double *last_time_u_, double *xWS_, double *xf_,
-                               int obstacles_num_, int obstacles_edges_sum_,
-                               T *obj_value);
+__global__ void kernel_objective(int n, const T *x, double ts_, int horizon_,
+                                 double *last_time_u_, double *xWS_,
+                                 double *xf_, int obstacles_num_,
+                                 int obstacles_edges_sum_, T *obj_value);
+
+template <typename T>
+void evalue_objective(int n, const T *x, double ts_, int horizon_,
+                      double *last_time_u_, double *xWS_, double *xf_,
+                      int obstacles_num_, int obstacles_edges_sum_,
+                      T *obj_value);
 
 }  // namespace planning
 }  // namespace apollo

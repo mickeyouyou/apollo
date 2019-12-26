@@ -101,6 +101,7 @@ cc_library(
         ":distance_approach_ipopt_fixed_ts_interface",
         ":distance_approach_ipopt_interface",
         ":distance_approach_ipopt_relax_end_interface",
+        ":distance_approach_ipopt_relax_end_slack_cuda_interface",
         ":distance_approach_ipopt_relax_end_slack_interface",
         "//cyber/common:log",
         "//modules/common/time",
@@ -210,6 +211,37 @@ cc_library(
 )
 
 cc_library(
+    name = "distance_approach_ipopt_relax_end_slack_cuda_interface",
+    srcs = ["distance_approach_ipopt_relax_end_slack_cuda_interface.cc"] + select({
+        "//tools/platforms:use_gpu": [
+            ":evaluation",
+        ],
+        "//conditions:default": [],
+    }),
+    hdrs = [
+        "distance_approach_interface.h",
+        "distance_approach_ipopt_relax_end_slack_cuda_interface.h",
+    ],
+    copts = [
+        "-DMODULE_NAME=\\\"planning\\\"",
+        "-fopenmp",
+        "-DUSE_GPU",
+    ],
+    deps = [
+        "//cyber/common:log",
+        "//modules/common/configs:vehicle_config_helper",
+        "//modules/common/math",
+        "//modules/common/util",
+        "//modules/planning/common:planning_gflags",
+        "//modules/planning/proto:planner_open_space_config_proto",
+        "//modules/planning/proto:planning_proto",
+        "@adolc",
+        "@eigen",
+        "@ipopt",
+    ],
+)
+
+cc_library(
     name = "distance_approach_ipopt_interface",
     srcs = ["distance_approach_ipopt_interface.cc"],
     hdrs = [
@@ -286,6 +318,15 @@ cuda_library(
     name = "planning_block",
     srcs = ["planning_block.cu"],
     hdrs = ["planning_block.h"],
+    deps = [
+        "@cuda",
+    ],
+)
+
+cuda_library(
+    name = "evaluation",
+    srcs = ["evaluation.cu"],
+    hdrs = ["evaluation.h"],
     deps = [
         "@cuda",
     ],

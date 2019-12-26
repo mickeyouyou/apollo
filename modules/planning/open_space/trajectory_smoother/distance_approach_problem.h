@@ -34,6 +34,7 @@
 #include "modules/planning/open_space/trajectory_smoother/distance_approach_ipopt_interface.h"
 #include "modules/planning/open_space/trajectory_smoother/distance_approach_ipopt_relax_end_interface.h"
 #include "modules/planning/open_space/trajectory_smoother/distance_approach_ipopt_relax_end_slack_interface.h"
+#include "modules/planning/open_space/trajectory_smoother/distance_approach_ipopt_relax_end_slack_cuda_interface.h"
 #include "modules/planning/proto/planning.pb.h"
 
 namespace apollo {

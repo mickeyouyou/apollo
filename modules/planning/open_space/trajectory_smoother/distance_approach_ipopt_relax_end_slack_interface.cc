@@ -50,6 +50,7 @@ DistanceApproachIPOPTRelaxEndSlackInterface::
   CHECK(horizon < std::numeric_limits<int>::max())
       << "Invalid cast on horizon in open space planner";
   horizon_ = static_cast<int>(horizon);
+  AWARN << "horizon_: " << horizon_;
   CHECK(obstacles_num < std::numeric_limits<int>::max())
       << "Invalid cast on obstacles_num in open space planner";
 

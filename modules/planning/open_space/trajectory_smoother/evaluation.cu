@@ -14,16 +14,16 @@
  * limitations under the License.
  *****************************************************************************/
 
-#include "solver.h"
+#include "evaluation.h"
 
 namespace apollo {
 namespace planning {
 
 template <typename T>
-__global__ void objective_eval(int n, const T *x, double ts_, int horizon_,
-                               double *last_time_u_, double *xWS_, double *xf_,
-                               int obstacles_num_, int obstacles_edges_sum_,
-                               T *obj_value) {
+__global__ void kernel_objective(int n, const T *x, double ts_, int horizon_,
+                                 double *last_time_u_, double *xWS_,
+                                 double *xf_, int obstacles_num_,
+                                 int obstacles_edges_sum_, T *obj_value) {
   // penalty
   //   maybe use thrust to keep these weights
   double weight_state_x_ = 18.0;
@@ -64,7 +64,7 @@ __global__ void objective_eval(int n, const T *x, double ts_, int horizon_,
 
   *obj_value = 0.0;
   // 1. objective to minimize state diff to warm up
-  //     CHECK_EQ(horizon_ + 1, xWS_.cols());
+  //    note: CHECK_EQ(horizon_ + 1, xWS_.cols());
   //   for (int i = 0; i < horizon_ + 1; ++i) {
   T x1_diff = x[i * 4] - xWS_[0 * (horizon_ + 1) + i];
   T x2_diff = x[i * 4 + 1] - xWS_[1 * (horizon_ + 1) + i];
@@ -77,12 +77,18 @@ __global__ void objective_eval(int n, const T *x, double ts_, int horizon_,
   //   state_index += 4;
   //   }
 
+  printf("obj_value after state diff: %f: \n", *obj_value);
+
   // 2. objective to minimize u square
   //   for (int i = 0; i < horizon_; ++i) {
-  *obj_value += weight_input_steer_ * x[i * 2] * x[control_index] +
-                weight_input_a_ * x[i * 2 + 1] * x[control_index + 1];
+  *obj_value += weight_input_steer_ * x[4 * (horizon_ + 1) + i * 2] *
+                    x[4 * (horizon_ + 1) + i * 2] +
+                weight_input_a_ * x[4 * (horizon_ + 1) + i * 2 + 1] *
+                    x[4 * (horizon_ + 1) + i * 2 + 1];
   //   control_index += 2;
   //   }
+
+  printf("obj_value after minimize u square: %f: \n", *obj_value);
 
   // 3. objective to minimize input change rate for first horizon
   control_index = control_start_index_;
@@ -93,6 +99,8 @@ __global__ void objective_eval(int n, const T *x, double ts_, int horizon_,
   *obj_value +=
       weight_stitching_steer_ * last_time_steer_rate * last_time_steer_rate +
       weight_stitching_a_ * last_time_a_rate * last_time_a_rate;
+
+  printf("obj_value after minimize input change rate: %f: \n", *obj_value);
 
   // 4. objective to minimize input change rates, [0- horizon_ -2]
   time_index++;
@@ -107,6 +115,8 @@ __global__ void objective_eval(int n, const T *x, double ts_, int horizon_,
   //   time_index++;
   //   }
 
+  printf("obj_value after minimize input change rates: %f: \n", *obj_value);
+
   // 5. objective to minimize total time [0, horizon_]
   time_index = time_start_index_;
   //   for (int i = 0; i < horizon_ + 1; ++i) {
@@ -116,6 +126,8 @@ __global__ void objective_eval(int n, const T *x, double ts_, int horizon_,
   *obj_value += first_order_penalty + second_order_penalty;
   // time_index++;
   //   }
+
+  printf("obj_value after minimize total time: %f: \n", *obj_value);
 
   // 6. end state constraints
   for (int i = 0; i < 4; ++i) {
@@ -128,15 +140,19 @@ __global__ void objective_eval(int n, const T *x, double ts_, int horizon_,
   for (int i = 0; i < slack_horizon_; ++i) {
     *obj_value += weight_slack_ * x[slack_index_ + i];
   }
+
+  printf("final obj_value after cuda evaluation: %f: \n", *obj_value);
 }
 
-// template __global__ void objective_eval<double>(int n, const double *x,
-// double ts_,
-//                                           int horizon_, double *last_time_u_,
-//                                           double *xWS_, double *xf_,
-//                                           int obstacles_num_,
-//                                           int obstacles_edges_sum_,
-//                                           double *obj_value);
+template <typename T>
+void evalue_objective(int n, const T *x, double ts_, int horizon_,
+                      double *last_time_u_, double *xWS_, double *xf_,
+                      int obstacles_num_, int obstacles_edges_sum_,
+                      T *obj_value) {
+  kernel_objective<T><<<2, 512>>>(n, x, ts_, horizon_, last_time_u_.data(),
+                                  xWS_.data(), xf_.data(), obstacles_num_,
+                                  obstacles_edges_sum_, &obj_value);
+}
 
 }  // namespace planning
 }  // namespace apollo

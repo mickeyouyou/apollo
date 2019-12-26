@@ -17,13 +17,17 @@
 /*
  * @file
  */
-#include "modules/planning/open_space/trajectory_smoother/distance_approach_ipopt_relax_end_slack_interface.h"
+#include "modules/planning/open_space/trajectory_smoother/distance_approach_ipopt_relax_end_slack_cuda_interface.h"
 // #define ADEBUG AERROR
+
+#ifdef USE_GPU
+#include "modules/planning/open_space/trajectory_smoother/evaluation.h"
+#endif
 namespace apollo {
 namespace planning {
 
-DistanceApproachIPOPTRelaxEndSlackInterface::
-    DistanceApproachIPOPTRelaxEndSlackInterface(
+DistanceApproachIPOPTRelaxEndSlackCudaInterface::
+    DistanceApproachIPOPTRelaxEndSlackCudaInterface(
         const size_t horizon, const double ts, const Eigen::MatrixXd& ego,
         const Eigen::MatrixXd& xWS, const Eigen::MatrixXd& uWS,
         const Eigen::MatrixXd& l_warm_up, const Eigen::MatrixXd& n_warm_up,
@@ -117,7 +121,7 @@ DistanceApproachIPOPTRelaxEndSlackInterface::
       distance_approach_config_.enable_constraint_check();
 }
 
-bool DistanceApproachIPOPTRelaxEndSlackInterface::get_nlp_info(
+bool DistanceApproachIPOPTRelaxEndSlackCudaInterface::get_nlp_info(
     int& n, int& m, int& nnz_jac_g, int& nnz_h_lag,
     IndexStyleEnum& index_style) {
   ADEBUG << "get_nlp_info";
@@ -166,7 +170,7 @@ bool DistanceApproachIPOPTRelaxEndSlackInterface::get_nlp_info(
   return true;
 }
 
-bool DistanceApproachIPOPTRelaxEndSlackInterface::get_bounds_info(
+bool DistanceApproachIPOPTRelaxEndSlackCudaInterface::get_bounds_info(
     int n, double* x_l, double* x_u, int m, double* g_l, double* g_u) {
   ADEBUG << "get_bounds_info";
   CHECK(XYbounds_.size() == 4)
@@ -402,7 +406,7 @@ bool DistanceApproachIPOPTRelaxEndSlackInterface::get_bounds_info(
   return true;
 }
 
-bool DistanceApproachIPOPTRelaxEndSlackInterface::get_starting_point(
+bool DistanceApproachIPOPTRelaxEndSlackCudaInterface::get_starting_point(
     int n, bool init_x, double* x, bool init_z, double* z_L, double* z_U, int m,
     bool init_lambda, double* lambda) {
   ADEBUG << "get_starting_point";
@@ -460,30 +464,35 @@ bool DistanceApproachIPOPTRelaxEndSlackInterface::get_starting_point(
   return true;
 }
 
-bool DistanceApproachIPOPTRelaxEndSlackInterface::eval_f(int n, const double* x,
-                                                         bool new_x,
-                                                         double& obj_value) {
-  eval_obj(n, x, &obj_value);
+bool DistanceApproachIPOPTRelaxEndSlackCudaInterface::eval_f(
+    int n, const double* x, bool new_x, double& obj_value) {
+  AINFO << "get into eval_f method";
+#ifdef USE_GPU
+  evalue_objective<double>(n, x, ts_, horizon_, last_time_u_.data(),
+                           xWS_.data(), xf_.data(), obstacles_num_,
+                           obstacles_edges_sum_, &obj_value);
+#else
+  AFATAL << "CUDA enabled without GPU!";
+#endif
   return true;
 }
 
-bool DistanceApproachIPOPTRelaxEndSlackInterface::eval_grad_f(int n,
-                                                              const double* x,
-                                                              bool new_x,
-                                                              double* grad_f) {
+bool DistanceApproachIPOPTRelaxEndSlackCudaInterface::eval_grad_f(
+    int n, const double* x, bool new_x, double* grad_f) {
   gradient(tag_f, n, x, grad_f);
   return true;
 }
 
-bool DistanceApproachIPOPTRelaxEndSlackInterface::eval_g(int n, const double* x,
-                                                         bool new_x, int m,
-                                                         double* g) {
+bool DistanceApproachIPOPTRelaxEndSlackCudaInterface::eval_g(int n,
+                                                             const double* x,
+                                                             bool new_x, int m,
+                                                             double* g) {
   eval_constraints(n, x, m, g);
   // if (enable_constraint_check_) check_g(n, x, m, g);
   return true;
 }
 
-bool DistanceApproachIPOPTRelaxEndSlackInterface::eval_jac_g(
+bool DistanceApproachIPOPTRelaxEndSlackCudaInterface::eval_jac_g(
     int n, const double* x, bool new_x, int m, int nele_jac, int* iRow,
     int* jCol, double* values) {
   if (enable_jacobian_ad_) {
@@ -507,14 +516,14 @@ bool DistanceApproachIPOPTRelaxEndSlackInterface::eval_jac_g(
   }
 }
 
-bool DistanceApproachIPOPTRelaxEndSlackInterface::eval_jac_g_ser(
+bool DistanceApproachIPOPTRelaxEndSlackCudaInterface::eval_jac_g_ser(
     int n, const double* x, bool new_x, int m, int nele_jac, int* iRow,
     int* jCol, double* values) {
   AERROR << "NOT READY";
   return false;
 }
 
-bool DistanceApproachIPOPTRelaxEndSlackInterface::eval_h(
+bool DistanceApproachIPOPTRelaxEndSlackCudaInterface::eval_h(
     int n, const double* x, bool new_x, double obj_factor, int m,
     const double* lambda, bool new_lambda, int nele_hess, int* iRow, int* jCol,
     double* values) {
@@ -548,7 +557,7 @@ bool DistanceApproachIPOPTRelaxEndSlackInterface::eval_h(
   return true;
 }
 
-void DistanceApproachIPOPTRelaxEndSlackInterface::finalize_solution(
+void DistanceApproachIPOPTRelaxEndSlackCudaInterface::finalize_solution(
     Ipopt::SolverReturn status, int n, const double* x, const double* z_L,
     const double* z_U, int m, const double* g, const double* lambda,
     double obj_value, const Ipopt::IpoptData* ip_data,
@@ -629,7 +638,7 @@ void DistanceApproachIPOPTRelaxEndSlackInterface::finalize_solution(
   free(hessval);
 }
 
-void DistanceApproachIPOPTRelaxEndSlackInterface::get_optimization_results(
+void DistanceApproachIPOPTRelaxEndSlackCudaInterface::get_optimization_results(
     Eigen::MatrixXd* state_result, Eigen::MatrixXd* control_result,
     Eigen::MatrixXd* time_result, Eigen::MatrixXd* dual_l_result,
     Eigen::MatrixXd* dual_n_result) const {
@@ -697,94 +706,8 @@ void DistanceApproachIPOPTRelaxEndSlackInterface::get_optimization_results(
 
 //***************    start ADOL-C part ***********************************
 template <class T>
-void DistanceApproachIPOPTRelaxEndSlackInterface::eval_obj(int n, const T* x,
-                                                           T* obj_value) {
-  // Objective is :
-  // min control inputs
-  // min input rate
-  // min time (if the time step is not fixed)
-  // regularization wrt warm start trajectory
-  DCHECK(ts_ != 0) << "ts in distance_approach_ is 0";
-  int control_index = control_start_index_;
-  int time_index = time_start_index_;
-  int state_index = state_start_index_;
-
-  // TODO(QiL): Initial implementation towards earlier understanding and debug
-  // purpose, later code refine towards improving efficiency
-
-  *obj_value = 0.0;
-  // TODO GRID BASED CALULATE Obj_value
-  // 1. objective to minimize state diff to warm up
-  for (int i = 0; i < horizon_ + 1; ++i) {
-    T x1_diff = x[state_index] - xWS_(0, i);
-    T x2_diff = x[state_index + 1] - xWS_(1, i);
-    T x3_diff = x[state_index + 2] - xWS_(2, i);
-    T x4_abs = x[state_index + 3];
-    *obj_value += weight_state_x_ * x1_diff * x1_diff +
-                  weight_state_y_ * x2_diff * x2_diff +
-                  weight_state_phi_ * x3_diff * x3_diff +
-                  weight_state_v_ * x4_abs * x4_abs;
-    state_index += 4;
-  }
-
-  // 2. objective to minimize u square
-  for (int i = 0; i < horizon_; ++i) {
-    *obj_value += weight_input_steer_ * x[control_index] * x[control_index] +
-                  weight_input_a_ * x[control_index + 1] * x[control_index + 1];
-    control_index += 2;
-  }
-
-  // 3. objective to minimize input change rate for first horizon
-  control_index = control_start_index_;
-  T last_time_steer_rate =
-      (x[control_index] - last_time_u_(0, 0)) / x[time_index] / ts_;
-  T last_time_a_rate =
-      (x[control_index + 1] - last_time_u_(1, 0)) / x[time_index] / ts_;
-  *obj_value +=
-      weight_stitching_steer_ * last_time_steer_rate * last_time_steer_rate +
-      weight_stitching_a_ * last_time_a_rate * last_time_a_rate;
-
-  // 4. objective to minimize input change rates, [0- horizon_ -2]
-  time_index++;
-  for (int i = 0; i < horizon_ - 1; ++i) {
-    T steering_rate =
-        (x[control_index + 2] - x[control_index]) / x[time_index] / ts_;
-    T a_rate =
-        (x[control_index + 3] - x[control_index + 1]) / x[time_index] / ts_;
-    *obj_value += weight_rate_steer_ * steering_rate * steering_rate +
-                  weight_rate_a_ * a_rate * a_rate;
-    control_index += 2;
-    time_index++;
-  }
-
-  // 5. objective to minimize total time [0, horizon_]
-  time_index = time_start_index_;
-  for (int i = 0; i < horizon_ + 1; ++i) {
-    T first_order_penalty = weight_first_order_time_ * x[time_index];
-    T second_order_penalty =
-        weight_second_order_time_ * x[time_index] * x[time_index];
-    *obj_value += first_order_penalty + second_order_penalty;
-    time_index++;
-  }
-
-  // 6. end state constraints
-  for (int i = 0; i < 4; ++i) {
-    *obj_value += weight_end_state_ *
-                  (x[state_start_index_ + 4 * horizon_ + i] - xf_(i, 0)) *
-                  (x[state_start_index_ + 4 * horizon_ + i] - xf_(i, 0));
-  }
-
-  // 7. slack variables
-  for (int i = 0; i < slack_horizon_; ++i) {
-    *obj_value += weight_slack_ * x[slack_index_ + i];
-  }
-}
-
-template <class T>
-void DistanceApproachIPOPTRelaxEndSlackInterface::eval_constraints(int n,
-                                                                   const T* x,
-                                                                   int m,
-                                                                   T* g) {
+void DistanceApproachIPOPTRelaxEndSlackCudaInterface::eval_constraints(
+    int n, const T* x, int m, T* g) {
   // state start index
   int state_index = state_start_index_;
 
@@ -1005,10 +928,10 @@ void DistanceApproachIPOPTRelaxEndSlackInterface::eval_constraints(int n,
   }
 }
 
-bool DistanceApproachIPOPTRelaxEndSlackInterface::check_g(int n,
-                                                          const double* x,
-                                                          int m,
-                                                          const double* g) {
+bool DistanceApproachIPOPTRelaxEndSlackCudaInterface::check_g(int n,
+                                                              const double* x,
+                                                              int m,
+                                                              const double* g) {
   int kN = n;
   int kM = m;
 
@@ -1091,7 +1014,7 @@ bool DistanceApproachIPOPTRelaxEndSlackInterface::check_g(int n,
   return true;
 }
 
-void DistanceApproachIPOPTRelaxEndSlackInterface::generate_tapes(
+void DistanceApproachIPOPTRelaxEndSlackCudaInterface::generate_tapes(
     int n, int m, int* nnz_jac_g, int* nnz_h_lag) {
   std::vector<double> xp(n);
   std::vector<double> lamp(m);
@@ -1111,7 +1034,13 @@ void DistanceApproachIPOPTRelaxEndSlackInterface::generate_tapes(
   for (int idx = 0; idx < n; idx++) {
     xa[idx] <<= xp[idx];
   }
-  eval_obj(n, &xa[0], &obj_value);
+#ifdef USE_GPU
+  // evalue_objective<double>(n, &xa[0], ts_, horizon_, last_time_u_.data(),
+  //                          xWS_.data(), xf_.data(), obstacles_num_,
+  //                          obstacles_edges_sum_, &obj_value);
+#else
+  AFATAL << "CUDA enabled without GPU!";
+#endif
   obj_value >>= dummy;
   trace_off();
 
@@ -1133,7 +1062,14 @@ void DistanceApproachIPOPTRelaxEndSlackInterface::generate_tapes(
     lam[idx] = 1.0;
   }
   sig = 1.0;
-  eval_obj(n, &xa[0], &obj_value);
+#ifdef USE_GPU
+  // evalue_objective<double>(n, &xa[0], ts_, horizon_, last_time_u_.data(),
+  //                          xWS_.data(), xf_.data(), obstacles_num_,
+  //                          obstacles_edges_sum_, &obj_value);
+#else
+  AFATAL << "CUDA enabled without GPU!";
+#endif
+
   obj_value *= mkparam(sig);
   eval_constraints(n, &xa[0], m, &g[0]);
   for (int idx = 0; idx < m; idx++) {
