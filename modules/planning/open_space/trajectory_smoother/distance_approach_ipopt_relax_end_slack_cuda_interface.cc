@@ -468,7 +468,7 @@ bool DistanceApproachIPOPTRelaxEndSlackCudaInterface::eval_f(
     int n, const double* x, bool new_x, double& obj_value) {
   AINFO << "get into eval_f method";
 #ifdef USE_GPU
-  evalue_objective<double>(n, x, ts_, horizon_, last_time_u_.data(),
+  evalue_objective(n, x, ts_, horizon_, last_time_u_.data(),
                            xWS_.data(), xf_.data(), obstacles_num_,
                            obstacles_edges_sum_, &obj_value);
 #else

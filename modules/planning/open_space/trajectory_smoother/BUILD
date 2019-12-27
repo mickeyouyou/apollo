@@ -214,6 +214,7 @@ cc_library(
     name = "distance_approach_ipopt_relax_end_slack_cuda_interface",
     srcs = ["distance_approach_ipopt_relax_end_slack_cuda_interface.cc"] + select({
         "//tools/platforms:use_gpu": [
+            "evaluation.h",
             ":evaluation",
         ],
         "//conditions:default": [],

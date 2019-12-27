@@ -16,6 +16,8 @@
 
 #include "evaluation.h"
 
+#include <thrust/device_vector.h>
+
 namespace apollo {
 namespace planning {
 
@@ -149,9 +151,18 @@ void evalue_objective(int n, const T *x, double ts_, int horizon_,
                       double *last_time_u_, double *xWS_, double *xf_,
                       int obstacles_num_, int obstacles_edges_sum_,
                       T *obj_value) {
-  kernel_objective<T><<<2, 512>>>(n, x, ts_, horizon_, last_time_u_.data(),
-                                  xWS_.data(), xf_.data(), obstacles_num_,
+  // TODO 1 blocks and threads
+  int threads = 1024;
+  int blocks = 2;
+  // TODO 2 transform x from host to device 
+  //   COPY DATA FROM HOST TO DEVICE BY THRUST
+
+  thrust::device_vector<T> D(4);
+//   T * obj_value = obj_value;
+    kernel_objective<<<blocks, threads>>>(n, x, ts_, horizon_, last_time_u_,
+                                  xWS_, xf_, obstacles_num_,
                                   obstacles_edges_sum_, &obj_value);
+    cudaDeviceSynchronize();
 }
 
 }  // namespace planning
