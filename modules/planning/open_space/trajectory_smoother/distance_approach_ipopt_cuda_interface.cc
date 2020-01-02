@@ -2297,7 +2297,6 @@ bool DistanceApproachIPOPTCUDAInterface::eval_h(int n, const double* x,
                 &hessval, options_L);
 
 #ifdef USE_GPU
-    // TODO(fengzongbao): maybe can update by cuda kernel 
     if (!data_transfer(values, hessval, nnz_L)) {
       for (int idx = 0; idx < nnz_L; idx++) {
         values[idx] = hessval[idx];

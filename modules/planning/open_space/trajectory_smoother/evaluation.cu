@@ -20,6 +20,97 @@
 
 namespace apollo {
 namespace planning {
+bool InitialCuda() {
+  int dev = 0;
+  cudaDeviceProp deviceProp;
+  checkCuda(cudaGetDeviceProperties(&deviceProp, dev));
+  printf("Using device %d: %s\n", dev, deviceProp.name);
+  checkCuda(cudaSetDevice(dev));
+  return true;
+}
+
+__global__ void data_feed_kernel(int *iRow, int *jCol, unsigned int *rind_L,
+                                 unsigned int *cind_L, const int nnz_L) {
+  int index = threadIdx.x + blockDim.x * blockIdx.x;
+
+  if (index < nnz_L) {
+    // printf("data_feed_kernel index : %d, nnz_L: %d \n", index, nnz_L);
+    iRow[index] = index;
+    jCol[index] = index;
+    // printf("data_feed_kernel rind_L[i]:%d, cind_L[i]:%d \n", rind_L[index],
+    //  cind_L[index]);
+  }
+}
+
+__global__ void set_kernel(double *dst, const double *src, const int size) {
+  int index = threadIdx.x + blockDim.x * blockIdx.x;
+
+  if (index < size) {
+    dst[index] = src[index];
+  }
+}
+
+void data_feed_util(int *iRow, int *jCol, unsigned int *rind_L,
+                    unsigned int *cind_L, const int nnz_L) {
+  InitialCuda();
+  printf("data_feed_util nnz_L: %d \n", nnz_L);
+  size_t threads_per_block = 1024;
+  size_t number_of_blocks = (nnz_L + threads_per_block - 1) / threads_per_block;
+
+  int *d_iRow, *d_jCol;
+  unsigned int *d_rind_L, *d_cind_L;
+
+  unsigned int nBytes = nnz_L * sizeof(int);
+  unsigned int nUBytes = nnz_L * sizeof(unsigned int);
+  cudaMalloc((void **)&d_iRow, nBytes);
+  cudaMalloc((void **)&d_jCol, nBytes);
+  cudaMalloc((void **)&d_rind_L, nUBytes);
+  cudaMalloc((void **)&d_cind_L, nUBytes);
+
+  cudaMemcpy(d_iRow, iRow, nBytes, cudaMemcpyHostToDevice);
+  cudaMemcpy(d_jCol, jCol, nBytes, cudaMemcpyHostToDevice);
+  cudaMemcpy(d_rind_L, rind_L, nUBytes, cudaMemcpyHostToDevice);
+  cudaMemcpy(d_cind_L, cind_L, nUBytes, cudaMemcpyHostToDevice);
+
+  // thrust::device_vector<int> d_iRow(iRow, iRow + nnz_L);
+  // thrust::device_vector<int> d_jCol(jCol, jCol + nnz_L);
+
+  // thrust::device_vector<unsigned int> d_rind_L(rind_L, rind_L + nnz_L);
+  // thrust::device_vector<unsigned int> d_cind_L(cind_L, cind_L + nnz_L);
+
+  cudaError_t error;
+  data_feed_kernel<<<number_of_blocks, threads_per_block>>>(
+      d_iRow, d_jCol, d_rind_L, d_cind_L, nnz_L);
+  // thrust::host_vector<int> h_iRow(d_iRow.begin(), d_iRow.end() + nnz_L);
+  // thrust::host_vector<int> h_jCol(d_jCol.begin(), d_jCol.end() + nnz_L);
+
+  //   printf("data_feed_util h_iROw.size: %d, h_jCol.size:%d \n",
+  //   h_iRow.size(),
+  //          h_jCol.size());
+  //   iRow = &h_iRow;
+  //   jCol = &h_jCol;
+
+  error = cudaGetLastError();
+  if (error != cudaSuccess) {
+    printf("Code: %d, Reason: %s\n", error, cudaGetErrorString(error));
+  }
+  checkCuda(cudaDeviceSynchronize());
+  cudaMemcpy(iRow, d_iRow, nBytes, cudaMemcpyDeviceToHost);
+  cudaMemcpy(jCol, d_jCol, nBytes, cudaMemcpyDeviceToHost);
+
+  cudaFree(d_iRow);
+  cudaFree(d_jCol);
+  cudaFree(d_rind_L);
+  cudaFree(d_cind_L);
+  cudaDeviceReset();
+}
+
+void data_set_util(double *dst, const double *src, const int size) {
+  int threads_per_block = 1024;
+  int blocks = (size + threads_per_block - 1) / threads_per_block;
+
+  set_kernel<<<blocks, threads_per_block>>>(dst, src, size);
+}
 
 template <typename T>
 __global__ void kernel_objective(int n, const T *x, double ts_, int horizon_,
@@ -146,7 +237,7 @@ __global__ void kernel_objective(int n, const T *x, double ts_, int horizon_,
   printf("final obj_value after cuda evaluation: %f: \n", *obj_value);
 }
 
-template <typename T>
+template <class T>
 void evalue_objective(int n, const T *x, double ts_, int horizon_,
                       double *last_time_u_, double *xWS_, double *xf_,
                       int obstacles_num_, int obstacles_edges_sum_,
@@ -154,15 +245,16 @@ void evalue_objective(int n, const T *x, double ts_, int horizon_,
   // TODO 1 blocks and threads
   int threads = 1024;
   int blocks = 2;
-  // TODO 2 transform x from host to device 
+  printf("debug data in evalue_objective, n: %d: \n", n);
+  // TODO 2 transform x from host to device
   //   COPY DATA FROM HOST TO DEVICE BY THRUST
 
-  thrust::device_vector<T> D(4);
-//   T * obj_value = obj_value;
-    kernel_objective<<<blocks, threads>>>(n, x, ts_, horizon_, last_time_u_,
-                                  xWS_, xf_, obstacles_num_,
-                                  obstacles_edges_sum_, &obj_value);
-    cudaDeviceSynchronize();
+  //   thrust::device_vector<T> D(4);
+  //   T * obj_value = obj_value;
+  // kernel_objective<<<blocks, threads>>>(n, x, ts_, horizon_, last_time_u_,
+  //                               xWS_, xf_, obstacles_num_,
+  //                               obstacles_edges_sum_, &obj_value);
+  // cudaDeviceSynchronize();
 }
 
 }  // namespace planning

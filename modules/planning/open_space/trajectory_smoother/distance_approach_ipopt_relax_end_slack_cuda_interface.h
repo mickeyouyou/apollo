@@ -129,6 +129,9 @@ class DistanceApproachIPOPTRelaxEndSlackCudaInterface
   //***************    start ADOL-C part ***********************************
   /** Template to compute constraints */
   template <class T>
+  void eval_obj(int n, const T* x, T* obj_value);
+
+  template <class T>
   void eval_constraints(int n, const T* x, int m, T* g);
 
   /** Method to generate the required tapes by ADOL-C*/
