@@ -34,11 +34,10 @@ __global__ void data_feed_kernel(int *iRow, int *jCol, unsigned int *rind_L,
   int index = threadIdx.x + blockDim.x * blockIdx.x;
 
   if (index < nnz_L) {
-    // printf("data_feed_kernel index : %d, nnz_L: %d \n", index, nnz_L);
-    iRow[index] = index;
-    jCol[index] = index;
-    // printf("data_feed_kernel rind_L[i]:%d, cind_L[i]:%d \n", rind_L[index],
-    //  cind_L[index]);
+    iRow[index] = rind_L[index];
+    jCol[index] = cind_L[index];
+    // printf("data_feed_kernel rind_L[%d]:%d, cind_L[%d]:%d \n", index,
+    //        rind_L[index], index, cind_L[index]);
   }
 }
 
@@ -52,7 +51,7 @@ __global__ void set_kernel(double *dst, const double *src, const int size) {
 
 void data_feed_util(int *iRow, int *jCol, unsigned int *rind_L,
                     unsigned int *cind_L, const int nnz_L) {
-  InitialCuda();
+  // InitialCuda();
   printf("data_feed_util nnz_L: %d \n", nnz_L);
   size_t threads_per_block = 1024;
   size_t number_of_blocks = (nnz_L + threads_per_block - 1) / threads_per_block;
@@ -84,15 +83,9 @@ void data_feed_util(int *iRow, int *jCol, unsigned int *rind_L,
   // thrust::host_vector<int> h_iRow(d_iRow.begin(), d_iRow.end() + nnz_L);
   // thrust::host_vector<int> h_jCol(d_jCol.begin(), d_jCol.end() + nnz_L);
 
-  //   printf("data_feed_util h_iROw.size: %d, h_jCol.size:%d \n",
-  //   h_iRow.size(),
-  //          h_jCol.size());
-  //   iRow = &h_iRow;
-  //   jCol = &h_jCol;
-
   error = cudaGetLastError();
   if (error != cudaSuccess) {
-    printf("Code: %d, Reason: %s\n", error, cudaGetErrorString(error));
+    printf("Code: %d, Message: %s\n", error, cudaGetErrorString(error));
   }
   checkCuda(cudaDeviceSynchronize());
   cudaMemcpy(iRow, d_iRow, nBytes, cudaMemcpyDeviceToHost);
@@ -109,7 +102,27 @@ void data_set_util(double *dst, const double *src, const int size) {
   int threads_per_block = 1024;
   int blocks = (size + threads_per_block - 1) / threads_per_block;
 
-  set_kernel<<<blocks, threads_per_block>>>(dst, src, size);
+  double *d_dst, *d_src;
+
+  unsigned int nBytes = size * sizeof(double);
+  cudaMalloc(&d_dst, nBytes);
+  cudaMalloc(&d_src, nBytes);
+
+  cudaMemcpy(d_dst, dst, nBytes, cudaMemcpyHostToDevice);
+  cudaMemcpy(d_src, src, nBytes, cudaMemcpyHostToDevice);
+
+  set_kernel<<<blocks, threads_per_block>>>(d_dst, d_src, size);
+
+  cudaError_t error;
+  error = cudaGetLastError();
+  if (error != cudaSuccess) {
+    printf("Code: %d, Message: %s\n", error, cudaGetErrorString(error));
+  }
+  checkCuda(cudaDeviceSynchronize());
+  // cudaMemcpy(src, d_src, nBytes, cudaMemcpyDeviceToHost);
+  cudaMemcpy(dst, d_dst, nBytes, cudaMemcpyDeviceToHost);
+  cudaFree(d_dst);
+  cudaFree(d_src);
 }
 
 template <typename T>

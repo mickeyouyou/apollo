@@ -466,7 +466,7 @@ bool DistanceApproachIPOPTRelaxEndSlackCudaInterface::get_starting_point(
 
 bool DistanceApproachIPOPTRelaxEndSlackCudaInterface::eval_f(
     int n, const double* x, bool new_x, double& obj_value) {
-  AINFO << "get into eval_f method";
+  ADEBUG << "get into eval_f method";
   eval_obj(n, x, &obj_value);
   // #ifdef USE_GPU
   //   evalue_objective(n, x, ts_, horizon_, last_time_u_.data(),
@@ -529,19 +529,20 @@ bool DistanceApproachIPOPTRelaxEndSlackCudaInterface::eval_h(
     int n, const double* x, bool new_x, double obj_factor, int m,
     const double* lambda, bool new_lambda, int nele_hess, int* iRow, int* jCol,
     double* values) {
-  AINFO << "get into eval_h method";
+  ADEBUG << "get into eval_h method";
   if (values == nullptr) {
-// return the structure. This is a symmetric matrix, fill the lower left
-// triangle only.
-// for (int idx = 0; idx < nnz_L; idx++) {
-//   iRow[idx] = rind_L[idx];
-//   jCol[idx] = cind_L[idx];
-// }
-#ifdef USE_GPU
-    data_feed_util(iRow, jCol, rind_L, cind_L, nnz_L);
-#else
-    AFATAL << "CUDA enabled without GPU!";
-#endif
+    // return the structure. This is a symmetric matrix, fill the lower left
+    // triangle only.
+    // TODO try malloc unified mamory for rind_L and cind_L
+    for (int idx = 0; idx < nnz_L; idx++) {
+      iRow[idx] = rind_L[idx];
+      jCol[idx] = cind_L[idx];
+    }
+    // #ifdef USE_GPU
+    //     data_feed_util(iRow, jCol, rind_L, cind_L, nnz_L);
+    // #else
+    //     AFATAL << "CUDA enabled without GPU!";
+    // #endif
 
   } else {
     // return the values. This is a symmetric matrix, fill the lower left
@@ -549,27 +550,27 @@ bool DistanceApproachIPOPTRelaxEndSlackCudaInterface::eval_h(
 
     obj_lam[0] = obj_factor;
 
-    for (int idx = 0; idx < m; idx++) {
-      obj_lam[1 + idx] = lambda[idx];
-    }
-    // #ifdef USE_GPU
-    //     data_set_util(&obj_lam[1], lambda, m);
-    // #else
-    //     AFATAL << "CUDA enabled without GPU!";
-    // #endif
+// for (int idx = 0; idx < m; idx++) {
+//   obj_lam[1 + idx] = lambda[idx];
+// }
+#ifdef USE_GPU
+    data_set_util(&obj_lam[1], lambda, m);
+#else
+    AFATAL << "CUDA enabled without GPU!";
+#endif
 
     set_param_vec(tag_L, m + 1, obj_lam);
     sparse_hess(tag_L, n, 1, const_cast<double*>(x), &nnz_L, &rind_L, &cind_L,
                 &hessval, options_L);
 
-    for (int idx = 0; idx < nnz_L; idx++) {
-      values[idx] = hessval[idx];
-    }
-    // #ifdef USE_GPU
-    //     data_set_util(values, hessval, nnz_L);
-    // #endif
+// for (int idx = 0; idx < nnz_L; idx++) {
+//   values[idx] = hessval[idx];
+// }
+#ifdef USE_GPU
+    data_set_util(values, hessval, nnz_L);
+#endif
   }
-  AINFO << "get out eval_h method";
+  ADEBUG << "get out eval_h method";
   return true;
 }
 
@@ -1111,6 +1112,7 @@ bool DistanceApproachIPOPTRelaxEndSlackCudaInterface::check_g(int n,
 
 void DistanceApproachIPOPTRelaxEndSlackCudaInterface::generate_tapes(
     int n, int m, int* nnz_jac_g, int* nnz_h_lag) {
+  ADEBUG << "get INTO method generate_tapes";
   std::vector<double> xp(n);
   std::vector<double> lamp(m);
   std::vector<double> zl(m);
@@ -1199,6 +1201,7 @@ void DistanceApproachIPOPTRelaxEndSlackCudaInterface::generate_tapes(
   sparse_hess(tag_L, n, 0, &xp[0], &nnz_L, &rind_L, &cind_L, &hessval,
               options_L);
   *nnz_h_lag = nnz_L;
+  ADEBUG << "get OUT method generate_tapes";
 }
 //***************    end   ADOL-C part ***********************************
 
