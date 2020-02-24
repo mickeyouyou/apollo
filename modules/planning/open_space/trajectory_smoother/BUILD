@@ -1,5 +1,6 @@
 load("//tools:cpplint.bzl", "cpplint")
 load("//tools:cuda_library.bzl", "cuda_library")
+load("//tools:cuda_library.bzl", "cuda_binary")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -230,6 +231,7 @@ cc_library(
     ],
     deps = [
         "//cyber/common:log",
+        "//cyber/time",
         "//modules/common/configs:vehicle_config_helper",
         "//modules/common/math",
         "//modules/common/util",
@@ -330,6 +332,63 @@ cuda_library(
     hdrs = ["evaluation.h"],
     deps = [
         "@cuda",
+    ],
+)
+
+
+# https://docs.bazel.build/versions/master/be/c-cpp.html#cc_binary
+cc_binary(
+    name = "tapeless_exam",
+    srcs = ["tapeless_detexam.cpp"],
+    deps = [
+        "@adolc",
+    ],
+)
+
+cc_binary(
+    name = "speelpenning",
+    srcs = ["speelpenning.cpp"],
+    deps = [
+        ":myclock",
+        "@adolc",
+    ],
+)
+
+
+cc_binary(
+    name = "sparse_jacobian",
+    srcs = ["sparse_jacobian.cpp"],
+    deps = [
+        "@adolc",
+    ],
+)
+
+cc_binary(
+    name = "hessmat",
+    srcs = ["hessmat.cpp"],
+    deps = [
+        "@adolc",
+    ],
+)
+
+cc_binary(
+    name = "liborpar",
+    srcs = ["liborpar.cpp"],
+    copts = [
+        "-DMODULE_NAME=\\\"planning\\\"",
+        "-fopenmp",
+    ],
+    deps = [
+        "@adolc",
+    ],
+)
+
+cc_library(
+    name = "myclock",
+    srcs = ["myclock.cpp"],
+    hdrs = ["myclock.h"],
+    deps = [
+        # "@adolc",
     ],
 )
 

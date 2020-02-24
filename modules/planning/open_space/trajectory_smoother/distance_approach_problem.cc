@@ -156,7 +156,7 @@ bool DistanceApproachProblem::Solve(
 
   Ipopt::ApplicationReturnStatus status = app->Initialize();
   if (status != Ipopt::Solve_Succeeded) {
-    AERROR << "*** Distiance Approach problem error during initialization!";
+    AERROR << "*** Distance Approach problem error during initialization!";
     return false;
   }
 

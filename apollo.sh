@@ -120,7 +120,7 @@ function generate_build_targets() {
   *)
 #    BUILD_TARGETS=`bazel query //modules/... union //cyber/...`
     # FIXME(all): temporarily disable modules doesn't compile in 18.04
-    BUILD_TARGETS=`bazel query //modules/... union //cyber/... except //modules/tools/visualizer/... except //modules/v2x/... except //modules/map/tools/map_datachecker/... $DISABLE_CYBER_MODULES`
+    BUILD_TARGETS=`bazel query //modules/... union //cyber/... except //modules/tools/visualizer/... except //modules/bridge/... except //modules/v2x/... except //modules/map/tools/map_datachecker/... $DISABLE_CYBER_MODULES`
   esac
 
   if [ $? -ne 0 ]; then
@@ -179,12 +179,12 @@ function build() {
         --key="apollo:data:commit_id" --value="$REVISION"
   fi
 
-  if [ -d /apollo-simulator ] && [ -e /apollo-simulator/build.sh ]; then
-    cd /apollo-simulator && bash build.sh build
-    if [ $? -ne 0 ]; then
-      fail 'Build failed!'
-    fi
-  fi
+  # if [ -d /apollo-simulator ] && [ -e /apollo-simulator/build.sh ]; then
+  #   cd /apollo-simulator && bash build.sh build
+  #   if [ $? -ne 0 ]; then
+  #     fail 'Build failed!'
+  #   fi
+  # fi
   if [ $? -eq 0 ]; then
     success 'Build passed!'
   else

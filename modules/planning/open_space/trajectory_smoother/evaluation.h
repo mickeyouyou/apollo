@@ -43,11 +43,11 @@ __global__ void kernel_objective(int n, const T *x, double ts_, int horizon_,
                                  double *xf_, int obstacles_num_,
                                  int obstacles_edges_sum_, T *obj_value);
 
-template <class T>
-void evalue_objective(int n, const T *x, double ts_, int horizon_,
+// template <class T>
+void evalue_objective(int n, const double *x, double ts_, int horizon_,
                       double *last_time_u_, double *xWS_, double *xf_,
                       int obstacles_num_, int obstacles_edges_sum_,
-                      T *obj_value);
+                      double *obj_value);
 
 }  // namespace planning
 }  // namespace apollo

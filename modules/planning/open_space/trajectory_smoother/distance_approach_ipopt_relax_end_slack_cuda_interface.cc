@@ -20,11 +20,24 @@
 #include "modules/planning/open_space/trajectory_smoother/distance_approach_ipopt_relax_end_slack_cuda_interface.h"
 // #define ADEBUG AERROR
 
+#include "cyber/time/time.h"
+
 #ifdef USE_GPU
 #include "modules/planning/open_space/trajectory_smoother/evaluation.h"
 #endif
 namespace apollo {
 namespace planning {
+
+void printmat(const char* name, int m, int n, double** M) {
+  int i, j;
+
+  printf("%s \n", name);
+  for (i = 0; i < m; i++) {
+    printf("\n %d: ", i);
+    for (j = 0; j < n; j++) printf(" %10.4f ", M[i][j]);
+  }
+  printf("\n");
+}
 
 DistanceApproachIPOPTRelaxEndSlackCudaInterface::
     DistanceApproachIPOPTRelaxEndSlackCudaInterface(
@@ -55,6 +68,7 @@ DistanceApproachIPOPTRelaxEndSlackCudaInterface::
   CHECK(horizon < std::numeric_limits<int>::max())
       << "Invalid cast on horizon in open space planner";
   horizon_ = static_cast<int>(horizon);
+  AINFO << "horizon:" << horizon;
   CHECK(obstacles_num < std::numeric_limits<int>::max())
       << "Invalid cast on obstacles_num in open space planner";
 
@@ -127,21 +141,22 @@ bool DistanceApproachIPOPTRelaxEndSlackCudaInterface::get_nlp_info(
   ADEBUG << "get_nlp_info";
   // n1 : states variables, 4 * (N+1)
   int n1 = 4 * (horizon_ + 1);
-  ADEBUG << "n1: " << n1;
+  AINFO << "n1: " << n1;
   // n2 : control inputs variables
   int n2 = 2 * horizon_;
-  ADEBUG << "n2: " << n2;
+  AINFO << "n2: " << n2;
   // n3 : sampling time variables
   int n3 = horizon_ + 1;
-  ADEBUG << "n3: " << n3;
+  AINFO << "n3: " << n3;
   // n4 : dual multiplier associated with obstacle shape
   lambda_horizon_ = obstacles_edges_num_.sum() * (horizon_ + 1);
-  ADEBUG << "lambda_horizon_: " << lambda_horizon_;
+  AINFO << "lambda_horizon_: " << lambda_horizon_;
   // n5 : dual multipier associated with car shape, obstacles_num*4 * (N+1)
   miu_horizon_ = obstacles_num_ * 4 * (horizon_ + 1);
-  ADEBUG << "miu_horizon_: " << miu_horizon_;
+  AINFO << "miu_horizon_: " << miu_horizon_;
   // n6 : slack variables related to safety min distance
   slack_horizon_ = obstacles_num_ * (horizon_ + 1);
+  AINFO << "slack_horizon_: " << slack_horizon_;
 
   // m1 : dynamics constatins
   int m1 = 4 * horizon_;
@@ -159,10 +174,10 @@ bool DistanceApproachIPOPTRelaxEndSlackCudaInterface::get_nlp_info(
 
   // number of variables
   n = num_of_variables_;
-  ADEBUG << "num_of_variables_ " << num_of_variables_;
+  AINFO << "num_of_variables_ " << num_of_variables_;
   // number of constraints
   m = num_of_constraints_;
-  ADEBUG << "num_of_constraints_ " << num_of_constraints_;
+  AINFO << "num_of_constraints_ " << num_of_constraints_;
 
   generate_tapes(n, m, &nnz_jac_g, &nnz_h_lag);
 
@@ -469,12 +484,12 @@ bool DistanceApproachIPOPTRelaxEndSlackCudaInterface::eval_f(
   ADEBUG << "get into eval_f method";
   eval_obj(n, x, &obj_value);
   // #ifdef USE_GPU
-  //   evalue_objective(n, x, ts_, horizon_, last_time_u_.data(),
-  //                            xWS_.data(), xf_.data(), obstacles_num_,
-  //                            obstacles_edges_sum_, &obj_value);
+  //   evalue_objective(n, x, ts_, horizon_, last_time_u_.data(), xWS_.data(),
+  //                    xf_.data(), obstacles_num_, obstacles_edges_sum_,
+  //                    &obj_value);
   // #else
-  //   //AFATAL << "CUDA enabled without GPU!";
-  //   eval_obj(n, x, &obj_value);
+  // AFATAL << "CUDA enabled without GPU!";
+  //   // eval_obj(n, x, &obj_value);
   // #endif
   return true;
 }
@@ -531,8 +546,8 @@ bool DistanceApproachIPOPTRelaxEndSlackCudaInterface::eval_h(
     double* values) {
   ADEBUG << "get into eval_h method";
   if (values == nullptr) {
-    // return the structure. This is a symmetric matrix, fill the lower left
-    // triangle only.
+    // first call: return the structure. This is a symmetric matrix, fill the
+    // lower left triangle only.
     // TODO try malloc unified mamory for rind_L and cind_L
     for (int idx = 0; idx < nnz_L; idx++) {
       iRow[idx] = rind_L[idx];
@@ -545,30 +560,30 @@ bool DistanceApproachIPOPTRelaxEndSlackCudaInterface::eval_h(
     // #endif
 
   } else {
-    // return the values. This is a symmetric matrix, fill the lower left
-    // triangle only
+    // later call: return the values. This is a symmetric matrix, fill the lower
+    // left triangle only
 
     obj_lam[0] = obj_factor;
 
-// for (int idx = 0; idx < m; idx++) {
-//   obj_lam[1 + idx] = lambda[idx];
-// }
-#ifdef USE_GPU
-    data_set_util(&obj_lam[1], lambda, m);
-#else
-    AFATAL << "CUDA enabled without GPU!";
-#endif
+    for (int idx = 0; idx < m; idx++) {
+      obj_lam[1 + idx] = lambda[idx];
+    }
+    // #ifdef USE_GPU
+    //     data_set_util(&obj_lam[1], lambda, m);
+    // #else
+    //     AFATAL << "CUDA enabled without GPU!";
+    // #endif
 
     set_param_vec(tag_L, m + 1, obj_lam);
     sparse_hess(tag_L, n, 1, const_cast<double*>(x), &nnz_L, &rind_L, &cind_L,
                 &hessval, options_L);
 
-// for (int idx = 0; idx < nnz_L; idx++) {
-//   values[idx] = hessval[idx];
-// }
-#ifdef USE_GPU
-    data_set_util(values, hessval, nnz_L);
-#endif
+    for (int idx = 0; idx < nnz_L; idx++) {
+      values[idx] = hessval[idx];
+    }
+    // #ifdef USE_GPU
+    //     data_set_util(values, hessval, nnz_L);
+    // #endif
   }
   ADEBUG << "get out eval_h method";
   return true;
@@ -1197,10 +1212,32 @@ void DistanceApproachIPOPTRelaxEndSlackCudaInterface::generate_tapes(
   hessval = nullptr;
   options_L[0] = 0;
   options_L[1] = 1;
-
+  auto t_start = cyber::Time::Now().ToSecond();
   sparse_hess(tag_L, n, 0, &xp[0], &nnz_L, &rind_L, &cind_L, &hessval,
               options_L);
+  auto t_end = cyber::Time::Now().ToSecond();
+
+  AINFO << "ADOL-C SPARSE HESS TIME IN SECOND:" << t_end - t_start;
+  // printmat(" ************************H", nnz_L, nnz_L, &hessval);
+  // printf("%s \n",name);
+  //   for(i=0; i<m ;i++) {
+  //       printf("\n %d: ",i);
+  //       for(j=0;j<n ;j++)
+  //           printf(" %10.4f ", M[i][j]);
+  //   }
+  //   printf("\n");
+
+  // ADEBUG << "Hessian Matrix:";
+  // for(int i=0; i<m ;i++) {
+  //   ADEBUG << "i:%d"<< i;
+  //   for(int j=0;j<n ;j++) {
+  //     ADEBUG << " %10.4f " << hessval[i][j]
+  //   }
+
+  // }
+
   *nnz_h_lag = nnz_L;
+  AINFO << "nnz_L:" << nnz_L;
   ADEBUG << "get OUT method generate_tapes";
 }
 //***************    end   ADOL-C part ***********************************

@@ -394,6 +394,7 @@ bool HybridAStar::GenerateSCurveSpeedAcceleration(HybridAStartResult* result) {
 
   // TODO(Jinyun): explore better time horizon heuristic
   const double path_length = result->accumulated_s.back();
+  // ratio [1.2, 1.5]
   const double total_t = std::max(gear ? 1.5 *
                                              (max_forward_v * max_forward_v +
                                               path_length * max_forward_acc) /
